@@ -100,7 +100,7 @@ func (sub *Subscription) ActivatePlan() error {
 
 	sub.Status = StatusActive
 	if sub.PendingPlanID != nil {
-		sub.PlanID = * sub.PendingPlanID
+		sub.PlanID = *sub.PendingPlanID
 		sub.PendingPlanID = nil
 	}
 
