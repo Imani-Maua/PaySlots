@@ -1,7 +1,10 @@
 package domain
 
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 
 func TestCancel(test *testing.T){
@@ -28,6 +31,61 @@ func TestCancel(test *testing.T){
 
 			if !tt.wantErr && sub.Status != StatusCancelled {
 				t.Errorf("expected status %q, got %q", StatusCancelled, sub.Status)
+			}
+		})
+	}
+}
+
+
+func TestBeginTrial(t *testing.T){
+
+
+	tests := []struct{
+		name string
+		initialStatus SubscriptionStatus
+		newPlanID int64
+		wantErr bool
+	}{
+		{"from free", StatusFree, 12, false},
+		{"from active", StatusActive, 12, false},
+		{"from cancelled", StatusCancelled, 12, true},
+		{"from trialing", StatusTrialing, 12, true},
+		{"from pastdue", StatusPastDue, 12, true},
+		{"from suspended", StatusSuspended, 12, true},
+		
+	}
+	
+
+	now := time.Now()
+	for _, tt := range tests{
+		t.Run(tt.name, func(t *testing.T) {
+
+			sub := &Subscription{
+				Status: tt.initialStatus,
+			}
+
+			err := sub.BeginTrial(tt.newPlanID, now)
+
+			if (err != nil) != tt.wantErr{
+				t.Errorf("got err = %v, wantErr = %v", err, tt.wantErr)
+			}
+
+			if !tt.wantErr{
+				if sub.Status != StatusTrialing {
+					t.Errorf("expected status %q, got %q", StatusTrialing, sub.Status)
+				}
+
+				if sub.PlanID != tt.newPlanID {
+					t.Errorf("expected planID %d, got %d", tt.newPlanID, sub.PlanID)
+				}
+
+				if sub.PendingPlanID != nil {
+					t.Errorf("expected pendingPlanID to be nil, got %v", sub.PendingPlanID)
+				}
+
+				if sub.PeriodEnd != now.AddDate(0,0, 30){
+					t.Errorf("expected PeriodEnd %v, got %v", now.AddDate(0, 0, 30), sub.PeriodEnd)
+				}
 			}
 		})
 	}
