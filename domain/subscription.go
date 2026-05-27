@@ -60,7 +60,6 @@ func (sub *Subscription) BeginTrial(newPlanID int64, now time.Time) error {
 
 
 // -- Check that we are still within a valid trial period for a user to change plans
-
 // we should be able to update the trial plan only from those plans that are already in trial mode
 // the status does not change, we change the plans
 
