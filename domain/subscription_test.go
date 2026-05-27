@@ -88,8 +88,6 @@ func TestBeginTrial(t *testing.T){
 		})
 	}
 }
-
-
 func TestUpdateTrialPlan(t *testing.T) {
 
 	now := time.Now()
@@ -128,6 +126,45 @@ func TestUpdateTrialPlan(t *testing.T) {
 				if sub.PlanID != tt.newPlan {
 					t.Errorf("expected planID %d, got %d", tt.newPlan, sub.PlanID)
 				}
+			}
+		})
+	}
+}
+
+
+func TestScheduleDowngrade(t *testing.T){
+
+	tests := []struct{
+		name string
+		initialStatus SubscriptionStatus
+		newPlanID int64
+		wantErr bool
+	}{
+		{"from active", StatusActive, 12, false},
+		{"from trialing", StatusTrialing, 12, true},
+		{"from suspended", StatusSuspended, 12, true},
+		{"from past_due", StatusPastDue, 12, true},
+		{"from free", StatusFree, 12, true},
+		{"from cancelled", StatusCancelled, 12, true},
+	}
+
+	for _, tt := range tests{
+		t.Run(tt.name, func(t *testing.T) {
+
+			sub := &Subscription{Status: tt.initialStatus}
+
+			err := sub.ScheduleDowngradePlan(tt.newPlanID)
+
+			if (err != nil) != tt.wantErr{
+				t.Errorf("err = %v, wantErr = %v", err, tt.wantErr)
+			}
+
+			if !tt.wantErr {
+    			if sub.PendingPlanID == nil {
+        			t.Errorf("expected pendingPlanID to be set, got nil")
+    			} else if *sub.PendingPlanID != tt.newPlanID {
+        			t.Errorf("expected pendingPlanID %d, got %d", tt.newPlanID, *sub.PendingPlanID)
+    			}
 			}
 		})
 	}
