@@ -35,8 +35,6 @@ func TestCancel(test *testing.T){
 		})
 	}
 }
-
-
 func TestBeginTrial(t *testing.T){
 
 
@@ -85,6 +83,50 @@ func TestBeginTrial(t *testing.T){
 
 				if sub.PeriodEnd != now.AddDate(0,0, 30){
 					t.Errorf("expected PeriodEnd %v, got %v", now.AddDate(0, 0, 30), sub.PeriodEnd)
+				}
+			}
+		})
+	}
+}
+
+
+func TestUpdateTrialPlan(t *testing.T) {
+
+	now := time.Now()
+
+	tests := []struct {
+		name          string
+		initialStatus SubscriptionStatus
+		periodEnd     time.Time
+		newPlan       int64
+		wantErr       bool
+	}{
+		{"from trialing, valid period", StatusTrialing, now.AddDate(0, 0, 1), 12, false},
+		{"from trialing, expired", StatusTrialing, now.AddDate(0, 0, -1), 12, true},
+		{"from active", StatusActive, now.AddDate(0, 0, 1), 12, true},
+		{"from free", StatusFree, now.AddDate(0, 0, 1), 12, true},
+		{"from past_due", StatusPastDue, now.AddDate(0, 0, 1), 12, true},
+		{"from suspended", StatusSuspended, now.AddDate(0, 0, 1), 12, true},
+		{"from cancelled", StatusCancelled, now.AddDate(0, 0, 1), 12, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			sub := &Subscription{
+				Status:    tt.initialStatus,
+				PeriodEnd: tt.periodEnd,
+			}
+
+			err := sub.UpdateTrialPlan(tt.newPlan, now)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("got err = %v, wantErr = %v", err, tt.wantErr)
+			}
+
+			if !tt.wantErr {
+				if sub.PlanID != tt.newPlan {
+					t.Errorf("expected planID %d, got %d", tt.newPlan, sub.PlanID)
 				}
 			}
 		})
