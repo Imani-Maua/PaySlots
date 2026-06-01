@@ -169,3 +169,113 @@ func TestScheduleDowngrade(t *testing.T){
 		})
 	}
 }
+
+func TestMarkPastDue(t *testing.T) {
+	tests := []struct {
+		name          string
+		initialStatus SubscriptionStatus
+		wantErr       bool
+	}{
+		{"from active", StatusActive, false},
+		{"from trialing", StatusTrialing, true},
+		{"from free", StatusFree, true},
+		{"from past_due", StatusPastDue, true},
+		{"from suspended", StatusSuspended, true},
+		{"from cancelled", StatusCancelled, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sub := &Subscription{Status: tt.initialStatus}
+
+			err := sub.MarkPastDue()
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("got err = %v, wantErr = %v", err, tt.wantErr)
+			}
+
+			if !tt.wantErr {
+				if sub.Status != StatusPastDue {
+					t.Errorf("expected status %q, got %q", StatusPastDue, sub.Status)
+				}
+				if sub.RetryCount != 0 {
+					t.Errorf("expected RetryCount 0, got %d", sub.RetryCount)
+				}
+			}
+		})
+	}
+}
+
+func TestRetry(t *testing.T) {
+	tests := []struct {
+		name           string
+		initialStatus  SubscriptionStatus
+		initialRetries int
+		wantExhausted  bool
+		wantErr        bool
+	}{
+		{"first retry", StatusPastDue, 0, false, false},
+		{"second retry", StatusPastDue, 1, false, false},
+		{"third retry, exhausted", StatusPastDue, 2, true, false},
+		{"from active", StatusActive, 0, false, true},
+		{"from trialing", StatusTrialing, 0, false, true},
+		{"from suspended", StatusSuspended, 0, false, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sub := &Subscription{
+				Status:     tt.initialStatus,
+				RetryCount: tt.initialRetries,
+			}
+
+			exhausted, err := sub.Retry()
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("got err = %v, wantErr = %v", err, tt.wantErr)
+			}
+
+			if !tt.wantErr {
+				if exhausted != tt.wantExhausted {
+					t.Errorf("got exhausted = %v, want %v", exhausted, tt.wantExhausted)
+				}
+				if sub.RetryCount != tt.initialRetries+1 {
+					t.Errorf("expected RetryCount %d, got %d", tt.initialRetries+1, sub.RetryCount)
+				}
+			}
+		})
+	}
+}
+
+func TestSuspend(t *testing.T) {
+	tests := []struct {
+		name          string
+		initialStatus SubscriptionStatus
+		wantErr       bool
+	}{
+		{"from past_due", StatusPastDue, false},
+		{"from active", StatusActive, true},
+		{"from trialing", StatusTrialing, true},
+		{"from free", StatusFree, true},
+		{"from suspended", StatusSuspended, true},
+		{"from cancelled", StatusCancelled, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sub := &Subscription{Status: tt.initialStatus}
+
+			err := sub.Suspend()
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("got err = %v, wantErr = %v", err, tt.wantErr)
+			}
+
+			if !tt.wantErr {
+				if sub.Status != StatusSuspended {
+					t.Errorf("expected status %q, got %q", StatusSuspended, sub.Status)
+				}
+			}
+		})
+	}
+}
